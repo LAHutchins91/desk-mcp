@@ -1,0 +1,7 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.LAHutchins91/desk",
+  "title": "Desk",
+  "description": "Approved support answers, refund rules, and escalation limits for AI assistants, over MCP.",
+  "version": "0.1.0"
+}
