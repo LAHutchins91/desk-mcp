@@ -13,7 +13,7 @@ import { renderLanding } from "./landing-page.js";
 import { installPluginAuth } from "./plugin-auth.js";
 import { installPublicPages } from "./public-pages.js";
 import { validateMcpClaims } from "./mcp-claims.js";
-import { MCP_CORS_HEADERS, mcpBrowserOriginAllowed } from "./mcp-clients.js";
+import { MCP_CORS_HEADERS, ensureStreamableHttpAccept, mcpBrowserOriginAllowed } from "./mcp-clients.js";
 import { FileDeskStore, SupabaseDeskStore, type DeskDb } from "./lib/store.js";
 import { installWorkspaceApi } from "./workspace-api.js";
 import { publicError } from "./lib/errors.js";
@@ -311,7 +311,7 @@ app.options("/mcp", (req, res) => {
   res.status(204).end();
 });
 
-app.post("/mcp", async (req, res) => {
+app.post("/mcp", ensureStreamableHttpAccept, async (req, res) => {
   if (!guardMcpOrigin(req, res)) return;
   if (!allowPublic(`mcp:${req.ip}`, 300, 60000)) return res.status(429).set("Retry-After", "60").json({ error: "Too many requests. Retry in one minute." });
   let server: McpServer | undefined;

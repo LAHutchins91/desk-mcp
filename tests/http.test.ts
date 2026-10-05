@@ -1,4 +1,4 @@
-import type { Server } from "node:http";
+import http, { type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../src/server.js";
 
@@ -19,6 +19,35 @@ afterAll(async () => {
 });
 
 const headers = { "content-type": "application/json", accept: "application/json, text/event-stream" };
+
+function postMcp(baseUrl: string, accept: string | undefined, body: unknown) {
+  const payload = JSON.stringify(body);
+  const url = new URL(baseUrl);
+  return new Promise<{ status: number; text: string; wwwAuthenticate?: string }>((resolve, reject) => {
+    const requestHeaders: http.OutgoingHttpHeaders = {
+      "content-type": "application/json",
+      "content-length": Buffer.byteLength(payload)
+    };
+    if (accept !== undefined) requestHeaders.accept = accept;
+    const req = http.request(
+      { hostname: url.hostname, port: url.port, path: "/mcp", method: "POST", headers: requestHeaders },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const wwwAuthenticate = res.headers["www-authenticate"];
+          resolve({
+            status: res.statusCode ?? 0,
+            text: Buffer.concat(chunks).toString("utf8"),
+            wwwAuthenticate: typeof wwwAuthenticate === "string" ? wwwAuthenticate : undefined
+          });
+        });
+      }
+    );
+    req.on("error", reject);
+    req.end(payload);
+  });
+}
 
 describe("streamable HTTP", () => {
   it("returns Desk tools from tools/list without an API key", async () => {
@@ -79,6 +108,32 @@ describe("streamable HTTP", () => {
     expect(homeHtml).toContain("14-day trial, then Pro");
     expect(homeHtml).not.toMatch(/\$\d/);
     expect(homeHtml).toContain("Do not promise what was never approved.");
+  });
+
+  it.each([
+    ["application/json"],
+    ["*/*"],
+    ["text/event-stream"],
+    [undefined]
+  ] as const)("lists tools when Accept is %s", async (accept) => {
+    const response = await postMcp(base, accept, { jsonrpc: "2.0", id: 11, method: "tools/list", params: {} });
+    expect(response.status).toBe(200);
+    const body = JSON.parse(response.text) as { result?: { tools?: Array<{ name: string }> }; error?: { message?: string } };
+    expect(body.error?.message ?? "").not.toMatch(/Not Acceptable/);
+    expect(body.result?.tools?.map((tool) => tool.name)).toContain("evaluate_commitment");
+  });
+
+  it("still requires OAuth for tools/call when Accept is only application/json", async () => {
+    const response = await postMcp(base, "application/json", {
+      jsonrpc: "2.0",
+      id: 12,
+      method: "tools/call",
+      params: { name: "list_support_desks", arguments: {} }
+    });
+    expect(response.status).toBe(401);
+    expect(response.wwwAuthenticate).toContain("oauth-protected-resource");
+    const body = JSON.parse(response.text) as { error?: string };
+    expect(body.error).toMatch(/Sign in to Desk/);
   });
 
   it("rejects a browser origin that is not an assistant", async () => {
