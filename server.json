@@ -3,13 +3,11 @@
   "name": "io.github.LAHutchins91/desk",
   "title": "Desk",
   "description": "Approved support answers, refund rules, and escalation limits for AI assistants, over MCP.",
-  "version": "0.1.0",
-  "icons": [
-    {
-      "src": "https://raw.githubusercontent.com/LAHutchins91/desk-mcp/main/logo.jpg",
-      "mimeType": "image/jpeg"
-    }
-  ],
+  "version": "1.0.0",
+  "repository": {
+    "url": "https://github.com/LAHutchins91/desk-mcp",
+    "source": "github"
+  },
   "remotes": [
     {
       "type": "streamable-http",
