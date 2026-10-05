@@ -82,7 +82,7 @@ export function createDeskServer(store: DeskStore) {
     answer: z.string().trim().min(1).max(8000),
     status,
     expectedRevision: z.number().int().positive().optional()
-  }, write, async (args) => saveAnswer(store, {
+  }, { ...write, destructiveHint: true }, async (args) => saveAnswer(store, {
     deskId: String(args.deskId),
     topic: String(args.topic),
     question: String(args.question),
