@@ -79,6 +79,37 @@ describe("streamable HTTP", () => {
     expect(homeHtml).toContain("14-day trial, then Pro");
     expect(homeHtml).not.toMatch(/\$\d/);
     expect(homeHtml).toContain("Do not promise what was never approved.");
+
+    const privacy = await fetch(`${base}/privacy`);
+    const policy = await privacy.text();
+    expect(privacy.status).toBe(200);
+    for (const phrase of [
+      "Effective October 5, 2026",
+      "Ouroboros Apps / Lawrence Hutchins",
+      "approved answers",
+      "refund rules",
+      "escalation limits",
+      "commitments",
+      "Supabase",
+      "Vercel",
+      "Google",
+      "Stripe",
+      "ChatGPT",
+      "private support form"
+    ]) expect(policy).toContain(phrase);
+    expect(policy).not.toMatch(/\$\s*\d/);
+
+    const configured = process.env.OPENAI_APPS_CHALLENGE;
+    delete process.env.OPENAI_APPS_CHALLENGE;
+    const missing = await fetch(`${base}/.well-known/openai-apps-challenge`);
+    expect(missing.status).toBe(404);
+    process.env.OPENAI_APPS_CHALLENGE = "directory-review-token";
+    const challenge = await fetch(`${base}/.well-known/openai-apps-challenge`);
+    expect(challenge.status).toBe(200);
+    expect(await challenge.text()).toBe("directory-review-token");
+    expect(challenge.headers.get("content-type")).toMatch(/text\/plain/);
+    if (configured === undefined) delete process.env.OPENAI_APPS_CHALLENGE;
+    else process.env.OPENAI_APPS_CHALLENGE = configured;
   });
 
   it("rejects a browser origin that is not an assistant", async () => {
