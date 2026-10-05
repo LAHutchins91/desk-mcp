@@ -15,6 +15,7 @@ ENV DESK_DATA_DIR=/tmp/desk-data
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
+COPY logo.jpg ./logo.jpg
 USER node
 EXPOSE 3000
 CMD ["node", "dist/src/server.js"]
