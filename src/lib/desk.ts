@@ -121,14 +121,14 @@ export function evaluateRefund(proposal: string, rules: RefundRuleRecord[]): Com
   if (!rule) {
     return baseVerdict(
       "REFUND",
-      "REFUSED. Do not promise a refund. No approved refund rule covers this proposal. Do not invent a refund, a partial refund, a feature, or a timeline."
+      "REFUSED. Do not promise a refund. No approved refund rule covers this proposal. Draft for human review. Do not invent a refund, a partial refund, a feature, or a timeline."
     );
   }
   return baseVerdict(
     "REFUND",
     rule.decision === "ALLOW"
-      ? "REFUSED. Do not say the proposal. The only approved wording for this situation is sayOnly. Say that verbatim, or do not mention a refund. Do not invent an amount, a date, or an extra condition."
-      : "REFUSED. Do not promise a refund. The matched rule denies one. The only approved wording is sayOnly. Do not invent a replacement offer that is not in sayOnly.",
+      ? "REFUSED. Do not say the proposal. The only approved wording for this situation is sayOnly. Say that verbatim, or draft for human review and do not mention a refund. Do not invent an amount, a date, or an extra condition."
+      : "REFUSED. Do not promise a refund. The matched rule denies one. The only approved wording is sayOnly. Draft for human review if you cannot say that verbatim. Do not invent a replacement offer that is not in sayOnly.",
     {
       sayOnly: rule.remedy,
       eligibilityWindowDays: rule.windowDays,
@@ -161,8 +161,8 @@ export function evaluateStatement(kind: "FEATURE" | "TIMELINE", proposal: string
   return baseVerdict(
     kind,
     usable.length
-      ? `REFUSED. This ${noun} is not an approved statement. Do not promise it and do not invent a similar one. You may only say a statement in approvedStatements, verbatim, after evaluate_commitment returns APPROVED for that exact text.`
-      : `REFUSED. No approved ${noun} statements exist. Do not promise a ${noun}.`,
+      ? `REFUSED. This ${noun} is not an approved statement. Do not promise it and do not invent a similar one. Draft for human review. You may only say a statement in approvedStatements, verbatim, after evaluate_commitment returns APPROVED for that exact text.`
+      : `REFUSED. No approved ${noun} statements exist. Draft for human review. Do not promise a ${noun}.`,
     {
       approvedStatements: listed,
       moreApprovedMayExist: usable.length > listed.length
@@ -198,7 +198,7 @@ export function applyChannelLimit(
       sayOnly: null,
       escalationChecked: true,
       escalationDecision: "REFUSED",
-      instruction: "REFUSED. No approved escalation limit covers this channel. Do not promise a refund, a feature, or a timeline, and do not invent an escalation path."
+      instruction: "REFUSED. No approved escalation limit covers this channel. Draft for human review. Do not promise a refund, a feature, or a timeline, and do not invent an escalation path."
     };
   }
   if (!promiseAllowed(limit, verdict.kind)) {
@@ -210,7 +210,7 @@ export function applyChannelLimit(
       sayOnly: null,
       escalationChecked: true,
       escalationDecision: "REFUSED",
-      instruction: `REFUSED. The approved escalation limit for this channel does not allow a ${verdict.kind.toLowerCase()} promise. Do not offer one. The highest approved tier on this limit is ${limit.maxTier}.`
+      instruction: `REFUSED. The approved escalation limit for this channel does not allow a ${verdict.kind.toLowerCase()} promise. Draft for human review. Do not offer one. The highest approved tier on this limit is ${limit.maxTier}.`
     };
   }
   return {
@@ -229,7 +229,7 @@ export function evaluateEscalation(action: EscalationAction, targetTier: string 
       action,
       maxTier: null,
       tierLadder: [],
-      instruction: "REFUSED. No approved escalation limit covers this channel. Do not promise a refund, a feature, or a timeline, and do not invent an escalation path."
+      instruction: "REFUSED. No approved escalation limit covers this channel. Draft for human review. Do not promise a refund, a feature, or a timeline, and do not invent an escalation path."
     };
   }
   const ladder = limit.tierLadder;
@@ -244,7 +244,7 @@ export function evaluateEscalation(action: EscalationAction, targetTier: string 
         action,
         maxTier: limit.maxTier,
         tierLadder: ladder,
-        instruction: "REFUSED. That tier is not within the approved escalation limit. Do not invent a destination. Stay on the recorded ladder at or below maxTier."
+        instruction: "REFUSED. That tier is not within the approved escalation limit. Draft for human review. Do not invent a destination. Stay on the recorded ladder at or below maxTier."
       };
     }
     return {
@@ -264,7 +264,7 @@ export function evaluateEscalation(action: EscalationAction, targetTier: string 
       action,
       maxTier: limit.maxTier,
       tierLadder: ladder,
-      instruction: `REFUSED. This channel cannot promise a ${kind.toLowerCase()}. Do not offer one. The highest approved tier is ${limit.maxTier}.`
+      instruction: `REFUSED. This channel cannot promise a ${kind.toLowerCase()}. Draft for human review. Do not offer one. The highest approved tier is ${limit.maxTier}.`
     };
   }
   return {
