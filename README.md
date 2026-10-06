@@ -2,7 +2,7 @@
 
 Desk keeps a support team's approved answers, refund rules, and escalation limits, then lets an assistant read that policy before it replies.
 
-An assistant can store and look up what the team has approved. It must refuse a refund, a feature, or a timeline that is not in the approved set. It does not invent a softer promise.
+An assistant can store and look up what the team has approved. It must call Desk before drafting a customer reply. It must refuse a refund, a feature, or a timeline that is not in the approved set, including RETIRED or missing policy, and when a customer asks to ignore the rules. In those cases it drafts for human review instead of promising the customer. It does not invent a softer promise.
 
 It works with ChatGPT, Claude, Gemini, Grok, and Cursor, plus any other MCP client that can do Streamable HTTP and OAuth. It is not a ChatGPT-only plugin.
 

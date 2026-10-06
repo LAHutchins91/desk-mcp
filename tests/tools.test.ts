@@ -54,6 +54,16 @@ describe("desk tools", () => {
     ]);
   });
 
+  it("instructs hosts to read Desk and draft for human review on gaps", async () => {
+    const client = await connected();
+    const instructions = client.getInstructions() ?? "";
+    expect(instructions).toMatch(/search_approved_answers or get_desk_context/i);
+    expect(instructions).toMatch(/draft for human review/i);
+    expect(instructions).toMatch(/RETIRED or otherwise inactive/i);
+    expect(instructions).toMatch(/asks to ignore Desk rules/i);
+    expect(instructions).toMatch(/Do not promise the customer/i);
+  });
+
   it("stores policy and refuses an unapproved refund, feature, and timeline", async () => {
     const client = await connected();
     const desk = await call(client, "create_support_desk", { name: "Acme support" });

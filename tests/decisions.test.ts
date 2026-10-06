@@ -58,6 +58,7 @@ describe("refund decisions", () => {
     expect(verdict.decision).toBe("REFUSED");
     expect(verdict.grantsRefund).toBe(false);
     expect(verdict.sayOnly).toBeNull();
+    expect(verdict.instruction).toMatch(/Draft for human review/i);
   });
 
   it("refuses invented wording even when the situation matches", () => {
