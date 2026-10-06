@@ -75,3 +75,7 @@ docker run --rm -p 3000:3000 desk-mcp
 ```
 
 A container without a terminal on stdin speaks MCP on stdio and still listens on port 3000.
+
+---
+
+More from Ouroboros: https://ouroborosapps.com
