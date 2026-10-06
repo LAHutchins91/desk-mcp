@@ -331,7 +331,7 @@ app.post("/mcp", ensureStreamableHttpAccept, async (req, res) => {
     try {
       const state = await subscriptionState(userId, token);
       if (state === "error") return res.status(503).json({ error: "Could not verify your subscription. Please retry." });
-      if (state !== "ok") return res.status(403).json({ error: "A Desk Pro subscription or active trial is required.", access_information: `${APP_BASE_URL}/access` });
+      if (state !== "ok") return res.status(403).json({ error: "This Desk account does not currently include access to Desk tools. Check that you connected the intended account.", access_information: `${APP_BASE_URL}/access` });
     } catch {
       return res.status(503).json({ error: "Could not verify your subscription. Please retry." });
     }
