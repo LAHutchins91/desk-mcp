@@ -7,6 +7,7 @@ import { connectPageBody } from "./connect-page.js";
 export const logo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="#14352b"/><rect x="48" y="72" width="160" height="112" rx="16" fill="#f4f1ea"/><path d="M72 112h112M72 140h80M72 168h96" stroke="#14352b" stroke-width="12" stroke-linecap="round"/></svg>`;
 
 const page = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Desk</title><link rel="icon" href="/icon.svg"><style>body{margin:0;background:#f6f4ef;color:#1c1915;font:17px/1.65 system-ui}main{max-width:840px;margin:40px auto;padding:24px}a{color:#0c6b4d}h1{line-height:1.15;font-size:40px}h2{margin-top:32px}h3{margin:18px 0 6px}nav,footer{display:flex;flex-wrap:wrap;gap:18px}section{border:1px solid #ddd6c8;border-radius:16px;padding:22px;margin:22px 0;background:#fff}input,textarea,select,button{font:inherit;box-sizing:border-box;max-width:100%;padding:10px;border:1px solid #c9c0b2;border-radius:8px;background:#fff;color:inherit}input,textarea{width:100%}label{display:block;margin:12px 0}button{cursor:pointer;margin:12px 8px 12px 0}code,pre{overflow-wrap:anywhere}pre{overflow:auto;background:#fff;padding:12px;border-radius:8px}#message{white-space:pre-wrap}small{color:#5c564c}</style></head><body><main><nav><a href="/app">Desk workspace</a><a href="/connect">Connect an assistant</a><a href="/support">Support</a></nav><h1>${title}</h1>${body}<footer><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/data">Your data</a></footer></main></body></html>`;
+const accessPage = (title: string, body: string) => page(title, body).replace('<a href="/app">Desk workspace</a>', "<span>Desk</span>");
 
 
 function logoFile(): string {
@@ -23,7 +24,7 @@ function logoFile(): string {
 }
 
 export function installPublicPages(app: Express, baseUrl: string, supabaseUrl: string, anonKey: string) {
-  app.get("/access", (_req, res) => res.type("html").send(page("Desk access", `<p>Support tools are available to Desk accounts with an active Pro subscription or a 14-day trial. This connection has no support-tool entitlement at present. It cannot change your plan or start a purchase. Desk does not print a price.</p><p>Verify that you connected the intended account. <a href="/connections">Manage the connection</a> or <a href="/support">contact support</a> if access looks incorrect.</p>`)));
+  app.get("/access", (_req, res) => res.type("html").send(accessPage("Desk access", `<p>Desk tools are available to Desk accounts with active access. The account on this connection does not currently have access to support tools. Nothing on this page can change your account or start a purchase.</p><p>Verify that you connected the intended account. <a href="/connections">Manage the connection</a> or <a href="/support">contact support</a> if access looks incorrect.</p>`)));
   app.get("/icon.svg", (_req, res) => res.type("svg").send(logo));
   app.get(["/logo.jpg", "/favicon.ico"], (_req, res) => {
     res.type("image/jpeg");

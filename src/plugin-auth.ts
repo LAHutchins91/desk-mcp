@@ -24,13 +24,13 @@ export function installPluginAuth(app: Express, baseUrl: string, supabaseUrl: st
     res.type("html").send(`<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect Desk</title>
 <style>body{margin:0;background:#f6f4ef;color:#1c1915;font:17px/1.6 system-ui}main{max-width:560px;margin:8vh auto;padding:28px}h1{line-height:1.2}a{color:#0c6b4d}button{font:inherit;padding:12px 20px;border-radius:10px;border:1px solid #0c6b4d;background:#0c6b4d;color:white;cursor:pointer;margin:8px 8px 8px 0}button:disabled{opacity:.5;cursor:wait}.secondary{background:transparent;color:#1c1915}.card{border:1px solid #ddd6c8;border-radius:16px;padding:24px;margin:20px 0;background:#fff}#error{color:#8d1d18;overflow-wrap:anywhere}label{display:block;margin:12px 0}input{box-sizing:border-box;width:100%;padding:10px;font:inherit;border:1px solid #c9c0b2;border-radius:8px;background:#fff;color:inherit}small{display:block;color:#5c564c}li{margin:8px 0}[hidden]{display:none!important}</style>
-</head><body><main><a href="/app">Desk</a><h1 id="heading">Connect your support desk</h1>
+</head><body><main><strong>Desk</strong><h1 id="heading">Connect your support desk</h1>
 <p id="status" role="status">Checking your sign-in…</p><p id="error" role="alert"></p>
 <button id="signout" class="secondary" hidden>Use a different account</button><button id="signin" hidden>Continue with Google</button>
 <details id="passwordLogin" hidden><summary>Sign in with email and password</summary><form id="passwordForm"><label>Email<input id="loginEmail" type="email" required autocomplete="username"></label><label>Password<input id="loginPassword" type="password" required autocomplete="current-password"></label><button>Sign in</button></form><small>For existing email and password accounts, including a review account. Google sign-in remains available above.</small></details>
 <section id="consent" class="card" hidden><h2 id="client"></h2><p>This application will be able to:</p>
 <ul><li>Read your desks, approved answers, refund rules, escalation limits, and approved feature or timeline statements.</li><li>Save or revise those records when you authorize it.</li><li>Read your account email and subscription status.</li></ul>
-<p>Your Desk Pro or trial subscription and account permissions still apply. Billing changes are not available through the support tools. The assistant must refuse a refund, feature, or timeline that is not in the approved set.</p>
+<p>Your Desk account permissions still apply. Billing changes are not available through the support tools. The assistant must refuse a refund, feature, or timeline that is not in the approved set.</p>
 <small id="destination"></small><small id="scopes"></small>
 <button id="approve">Connect</button><button id="deny" class="secondary">Cancel</button></section>
 <section id="connections" hidden><p>You can disconnect an application at any time.</p><div id="grants"></div></section>
