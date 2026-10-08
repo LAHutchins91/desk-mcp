@@ -334,14 +334,18 @@ function mapCommitment(row: Row): CommitmentRecord {
   };
 }
 
+// Bare filters keep double quotes as characters: `ilike."email"` looks for `"email"`.
+// PostgREST removes quotes only inside in(), or(), and and(). `\` is the LIKE escape,
+// so `%` and `_` stay literal. PostgREST rewrites `*` to `%`; the backslash turns that into a literal percent.
 function literalIlike(column: string, value: string): string {
-  const escaped = value.replace(/\\/g, "\\\\").replace(/[%_*]/g, "\\$&").replace(/"/g, '\\"');
-  return `${column}=ilike.${encodeURIComponent(`"${escaped}"`)}`;
+  const escaped = value.replace(/\\/g, "\\\\").replace(/[%_*]/g, "\\$&");
+  return `${column}=ilike.${encodeURIComponent(escaped)}`;
 }
 
 function searchOr(query: string, columns: string[]): string {
   if (!query) return "";
   const q = query.replace(/\\/g, "\\\\").replace(/[%_*]/g, "\\$&").replace(/"/g, '\\"');
+  // Quotes here are syntax. Inside or() they are removed, and they keep a comma in the query from splitting the list.
   const clause = `(${columns.map((column) => `${column}.ilike."%${q}%"`).join(",")})`;
   return `&or=${encodeURIComponent(clause)}`;
 }
