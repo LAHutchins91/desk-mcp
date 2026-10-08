@@ -140,7 +140,9 @@ app.post("/billing/webhook", express.raw({ type: "application/json" }), async (r
     if (!signature || !Buffer.isBuffer(req.body)) return res.status(400).send("Missing Stripe signature");
     const event = stripeEvent(req.body, signature);
     const object = event.data.object;
-    if (event.type === "checkout.session.completed") {
+    // Every product on this Stripe account receives every event; only act on Desk's own.
+    const isDeskCheckout = typeof object.success_url === "string" && object.success_url.startsWith(`${APP_BASE_URL}/`);
+    if (event.type === "checkout.session.completed" && isDeskCheckout) {
       const userId = typeof object.client_reference_id === "string" ? object.client_reference_id : undefined;
       if (userId) {
         await updateBillingProfile(userId, {
@@ -152,10 +154,11 @@ app.post("/billing/webhook", express.raw({ type: "application/json" }), async (r
     if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(event.type)) {
       const metadata = (object.metadata ?? {}) as JsonObject;
       const userId = typeof metadata.supabase_user_id === "string" ? metadata.supabase_user_id : undefined;
-      if (userId) {
+      const priceId = (((object.items as JsonObject | undefined)?.data as JsonObject[] | undefined)?.[0]?.price as JsonObject | undefined)?.id;
+      const isDeskPrice = typeof priceId === "string" && [STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY].includes(priceId);
+      if (userId && isDeskPrice) {
         const status = typeof object.status === "string" ? object.status : "unknown";
         const periodEnd = typeof object.current_period_end === "number" ? new Date(object.current_period_end * 1000).toISOString() : null;
-        const priceId = (((object.items as JsonObject | undefined)?.data as JsonObject[] | undefined)?.[0]?.price as JsonObject | undefined)?.id;
         const entitled = status === "active" || status === "trialing";
         const plan = !entitled ? "none" : priceId === STRIPE_PRICE_YEARLY ? "annual" : "pro";
         await updateBillingProfile(userId, {
