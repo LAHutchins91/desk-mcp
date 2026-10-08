@@ -239,6 +239,7 @@ app.post("/billing/checkout", async (req, res) => {
     );
     const params = new URLSearchParams();
     params.set("mode", "subscription");
+    params.set("automatic_tax[enabled]", "true");
     params.set("line_items[0][price]", price);
     params.set("line_items[0][quantity]", "1");
     params.set("client_reference_id", user.id);
@@ -249,8 +250,10 @@ app.post("/billing/checkout", async (req, res) => {
     params.set("success_url", `${APP_BASE_URL}/?checkout=success`);
     params.set("cancel_url", `${APP_BASE_URL}/?checkout=cancelled`);
     const customerId = profiles[0]?.stripe_customer_id;
-    if (customerId) params.set("customer", customerId);
-    else if (user.email) params.set("customer_email", user.email);
+    if (customerId) {
+      params.set("customer", customerId);
+      params.set("customer_update[address]", "auto");
+    } else if (user.email) params.set("customer_email", user.email);
     const session = await stripeRequest<{ id: string; url: string }>("checkout/sessions", params);
     res.json({ id: session.id, url: session.url });
   } catch {
