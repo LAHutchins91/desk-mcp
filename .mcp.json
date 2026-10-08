@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "desk": {
+      "url": "https://desk-mcp-continuity2.vercel.app/mcp"
+    }
+  }
+}
