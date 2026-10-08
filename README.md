@@ -8,6 +8,13 @@ It works with ChatGPT, Claude, Gemini, Grok, and Cursor, plus any other MCP clie
 
 Sign in with your Desk account when the assistant opens OAuth. Do not paste an API key or password into a header. Support tools need Pro or an active trial. The trial is 14 days, then Pro. Checkout shows the plan terms. This page does not print a price.
 
+## Hosted server
+
+- MCP server URL: `https://desk-mcp-continuity2.vercel.app/mcp` (Streamable HTTP, OAuth sign-in)
+- Docs: https://ouroborosapps.com/docs/desk
+- Status: early access. Paste the URL into Claude, Cursor, Grok, or ChatGPT developer mode.
+- Registry name: `io.github.LAHutchins91/desk`
+
 ## What the assistant can do
 
 After you approve the connection, the server exposes these tools:

@@ -2,23 +2,23 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.LAHutchins91/desk",
   "title": "Desk",
-  "description": "Approved support answers, refund rules, and escalation limits for AI assistants, over MCP.",
-  "version": "1.0.1",
-  "websiteUrl": "https://desk-mcp.vercel.app",
+  "description": "Approved support answers, refund rules, and escalation limits for AI assistants.",
+  "version": "1.0.2",
+  "websiteUrl": "https://ouroborosapps.com/docs/desk",
   "repository": {
     "url": "https://github.com/LAHutchins91/desk-mcp",
     "source": "github"
   },
   "icons": [
     {
-      "src": "https://desk-mcp.vercel.app/logo.jpg",
+      "src": "https://desk-mcp-continuity2.vercel.app/logo.jpg",
       "mimeType": "image/jpeg"
     }
   ],
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://desk-mcp.vercel.app/mcp"
+      "url": "https://desk-mcp-continuity2.vercel.app/mcp"
     }
   ]
 }
