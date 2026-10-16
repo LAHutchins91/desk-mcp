@@ -21,6 +21,8 @@ export type AnswerRecord = {
   status: RecordStatus;
   revision: number;
   updatedAt: string;
+  /** Optional ISO time after which the record is stale. Absent or null means it never expires. */
+  expiresAt?: string | null;
 };
 
 export type RefundRuleRecord = {
@@ -34,6 +36,8 @@ export type RefundRuleRecord = {
   status: RecordStatus;
   revision: number;
   updatedAt: string;
+  /** Optional ISO time after which the record is stale. Absent or null means it never expires. */
+  expiresAt?: string | null;
 };
 
 export type EscalationLimitRecord = {
@@ -50,6 +54,8 @@ export type EscalationLimitRecord = {
   status: RecordStatus;
   revision: number;
   updatedAt: string;
+  /** Optional ISO time after which the record is stale. Absent or null means it never expires. */
+  expiresAt?: string | null;
 };
 
 export type CommitmentRecord = {
@@ -61,6 +67,8 @@ export type CommitmentRecord = {
   status: RecordStatus;
   revision: number;
   updatedAt: string;
+  /** Optional ISO time after which the record is stale. Absent or null means it never expires. */
+  expiresAt?: string | null;
 };
 
 export type DeskExport = {
@@ -69,6 +77,27 @@ export type DeskExport = {
   refundRules: RefundRuleRecord[];
   escalationLimits: EscalationLimitRecord[];
   commitments: CommitmentRecord[];
+};
+
+export type FactType = "answer" | "refund_rule" | "escalation_limit" | "commitment";
+
+export type FactVersion = {
+  deskId: string;
+  factType: FactType;
+  factId: string;
+  revision: number;
+  snapshot: Record<string, unknown>;
+  replacedAt: string;
+};
+
+export type FactUsage = {
+  deskId: string;
+  tool: string;
+  factType: FactType;
+  factId: string;
+  revision: number;
+  stale: boolean;
+  usedAt: string;
 };
 
 export type DeskDb = <T>(pathname: string, options?: RequestInit) => Promise<T>;
@@ -97,6 +126,10 @@ export interface DeskStore {
   insertCommitment(row: CommitmentRecord): Promise<CommitmentRecord>;
   updateCommitment(row: CommitmentRecord, expectedRevision: number): Promise<CommitmentRecord | null>;
   listCommitments(deskId: string, kind: CommitmentKind | undefined, includeRetired: boolean): Promise<CommitmentRecord[]>;
+  recordVersion(version: FactVersion): Promise<void>;
+  listVersions(deskId: string, factId: string): Promise<FactVersion[]>;
+  logUsage(entries: FactUsage[]): Promise<void>;
+  listUsage(deskId: string, factId: string | undefined, limit: number): Promise<FactUsage[]>;
 }
 
 type FileShape = {
@@ -105,9 +138,12 @@ type FileShape = {
   refundRules: RefundRuleRecord[];
   escalationLimits: EscalationLimitRecord[];
   commitments: CommitmentRecord[];
+  versions: FactVersion[];
+  usage: FactUsage[];
 };
 
-const emptyFile = (): FileShape => ({ desks: [], answers: [], refundRules: [], escalationLimits: [], commitments: [] });
+const emptyFile = (): FileShape => ({ desks: [], answers: [], refundRules: [], escalationLimits: [], commitments: [], versions: [], usage: [] });
+const USAGE_CAP = 5000;
 
 function sameText(left: string, right: string): boolean {
   return left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
@@ -135,7 +171,9 @@ export class FileDeskStore implements DeskStore {
           answers: parsed.answers ?? [],
           refundRules: parsed.refundRules ?? [],
           escalationLimits: parsed.escalationLimits ?? [],
-          commitments: parsed.commitments ?? []
+          commitments: parsed.commitments ?? [],
+          versions: parsed.versions ?? [],
+          usage: parsed.usage ?? []
         };
       } catch (error) {
         const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
@@ -178,6 +216,8 @@ export class FileDeskStore implements DeskStore {
       data.refundRules = data.refundRules.filter((row) => row.deskId !== deskId);
       data.escalationLimits = data.escalationLimits.filter((row) => row.deskId !== deskId);
       data.commitments = data.commitments.filter((row) => row.deskId !== deskId);
+      data.versions = data.versions.filter((row) => row.deskId !== deskId);
+      data.usage = data.usage.filter((row) => row.deskId !== deskId);
       return data.desks.length !== before;
     });
   }
@@ -245,6 +285,22 @@ export class FileDeskStore implements DeskStore {
   listCommitments(deskId: string, kind: CommitmentKind | undefined, includeRetired: boolean) {
     return this.locked((data) => data.commitments.filter((row) => row.deskId === deskId && (!kind || row.kind === kind) && (includeRetired || row.status === "APPROVED")).map(clone));
   }
+  recordVersion(version: FactVersion) {
+    return this.locked((data) => { data.versions.push(clone(version)); });
+  }
+  listVersions(deskId: string, factId: string) {
+    return this.locked((data) => data.versions.filter((row) => row.deskId === deskId && row.factId === factId).sort((a, b) => b.revision - a.revision).slice(0, 100).map(clone));
+  }
+  logUsage(entries: FactUsage[]) {
+    if (!entries.length) return Promise.resolve();
+    return this.locked((data) => {
+      data.usage.push(...entries.map(clone));
+      if (data.usage.length > USAGE_CAP) data.usage = data.usage.slice(-USAGE_CAP);
+    });
+  }
+  listUsage(deskId: string, factId: string | undefined, limit: number) {
+    return this.locked((data) => data.usage.filter((row) => row.deskId === deskId && (!factId || row.factId === factId)).slice(-limit).reverse().map(clone));
+  }
 }
 
 function byUpdated(a: { updatedAt: string }, b: { updatedAt: string }) {
@@ -302,20 +358,25 @@ function asStatus(value: unknown): RecordStatus {
   return value === "RETIRED" ? "RETIRED" : "APPROVED";
 }
 
+// Before the expiry migration runs the column is absent; keep undefined so writes omit it.
+function asExpiry(row: Row): string | null | undefined {
+  return "expires_at" in row ? asStringOrNull(row.expires_at) : undefined;
+}
+
 function mapDesk(row: Row): DeskRecord {
   return { id: asString(row.id), name: asString(row.name), description: asStringOrNull(row.description), updatedAt: asString(row.updated_at) };
 }
 function mapAnswer(row: Row): AnswerRecord {
   return {
     id: asString(row.id), deskId: asString(row.desk_id), topic: asString(row.topic), question: asString(row.question),
-    answer: asString(row.answer), status: asStatus(row.status), revision: asNumber(row.revision), updatedAt: asString(row.updated_at)
+    answer: asString(row.answer), status: asStatus(row.status), revision: asNumber(row.revision), updatedAt: asString(row.updated_at), expiresAt: asExpiry(row)
   };
 }
 function mapRefund(row: Row): RefundRuleRecord {
   return {
     id: asString(row.id), deskId: asString(row.desk_id), name: asString(row.name), matchTerms: asStrings(row.match_terms),
     decision: row.decision === "DENY" ? "DENY" : "ALLOW", remedy: asString(row.remedy), windowDays: asNumberOrNull(row.window_days),
-    status: asStatus(row.status), revision: asNumber(row.revision), updatedAt: asString(row.updated_at)
+    status: asStatus(row.status), revision: asNumber(row.revision), updatedAt: asString(row.updated_at), expiresAt: asExpiry(row)
   };
 }
 function mapEscalation(row: Row): EscalationLimitRecord {
@@ -323,14 +384,14 @@ function mapEscalation(row: Row): EscalationLimitRecord {
     id: asString(row.id), deskId: asString(row.desk_id), name: asString(row.name), channel: asString(row.channel),
     tierLadder: asStrings(row.tier_ladder), maxTier: asString(row.max_tier), allowRefundPromise: asBoolean(row.allow_refund_promise),
     allowFeaturePromise: asBoolean(row.allow_feature_promise), allowTimelinePromise: asBoolean(row.allow_timeline_promise),
-    notes: asString(row.notes), status: asStatus(row.status), revision: asNumber(row.revision), updatedAt: asString(row.updated_at)
+    notes: asString(row.notes), status: asStatus(row.status), revision: asNumber(row.revision), updatedAt: asString(row.updated_at), expiresAt: asExpiry(row)
   };
 }
 function mapCommitment(row: Row): CommitmentRecord {
   return {
     id: asString(row.id), deskId: asString(row.desk_id), kind: row.kind === "TIMELINE" ? "TIMELINE" : "FEATURE",
     name: asString(row.name), statement: asString(row.statement), status: asStatus(row.status),
-    revision: asNumber(row.revision), updatedAt: asString(row.updated_at)
+    revision: asNumber(row.revision), updatedAt: asString(row.updated_at), expiresAt: asExpiry(row)
   };
 }
 
@@ -487,24 +548,55 @@ export class SupabaseDeskStore implements DeskStore {
     const kindFilter = kind ? `&kind=eq.${kind}` : "";
     return this.rows(`/rest/v1/approved_commitments?desk_id=eq.${deskId}${kindFilter}${status}&select=*&order=name,id&limit=200`, mapCommitment);
   }
+  async recordVersion(v: FactVersion) {
+    await this.db("/rest/v1/desk_fact_versions", {
+      method: "POST", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ desk_id: v.deskId, fact_type: v.factType, fact_id: v.factId, revision: v.revision, snapshot: v.snapshot, replaced_at: v.replacedAt })
+    });
+  }
+  async listVersions(deskId: string, factId: string) {
+    return this.rows(`/rest/v1/desk_fact_versions?desk_id=eq.${deskId}&fact_id=eq.${factId}&select=*&order=revision.desc&limit=100`, (row) => ({
+      deskId: asString(row.desk_id), factType: asString(row.fact_type) as FactType, factId: asString(row.fact_id),
+      revision: asNumber(row.revision), snapshot: (row.snapshot ?? {}) as Record<string, unknown>, replacedAt: asString(row.replaced_at)
+    }));
+  }
+  async logUsage(entries: FactUsage[]) {
+    if (!entries.length) return;
+    await this.db("/rest/v1/desk_fact_usage", {
+      method: "POST", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(entries.map((e) => ({ desk_id: e.deskId, tool: e.tool, fact_type: e.factType, fact_id: e.factId, revision: e.revision, stale: e.stale, used_at: e.usedAt })))
+    });
+  }
+  async listUsage(deskId: string, factId: string | undefined, limit: number) {
+    const fact = factId ? `&fact_id=eq.${factId}` : "";
+    return this.rows(`/rest/v1/desk_fact_usage?desk_id=eq.${deskId}${fact}&select=*&order=used_at.desc&limit=${limit}`, (row) => ({
+      deskId: asString(row.desk_id), tool: asString(row.tool), factType: asString(row.fact_type) as FactType, factId: asString(row.fact_id),
+      revision: asNumber(row.revision), stale: asBoolean(row.stale), usedAt: asString(row.used_at)
+    }));
+  }
 }
 
+// Sent only when the record carries an expiry, so desks that never use expiry
+// keep writing the exact pre-migration body.
+function expiry(row: { expiresAt?: string | null }) {
+  return row.expiresAt === undefined ? {} : { expires_at: row.expiresAt };
+}
 function answerPayload(row: AnswerRecord) {
-  return { id: row.id, desk_id: row.deskId, topic: row.topic, question: row.question, answer: row.answer, status: row.status, revision: row.revision, updated_at: row.updatedAt };
+  return { id: row.id, desk_id: row.deskId, topic: row.topic, question: row.question, answer: row.answer, status: row.status, revision: row.revision, updated_at: row.updatedAt, ...expiry(row) };
 }
 function refundPayload(row: RefundRuleRecord) {
   return {
     id: row.id, desk_id: row.deskId, name: row.name, match_terms: row.matchTerms, decision: row.decision,
-    remedy: row.remedy, window_days: row.windowDays, status: row.status, revision: row.revision, updated_at: row.updatedAt
+    remedy: row.remedy, window_days: row.windowDays, status: row.status, revision: row.revision, updated_at: row.updatedAt, ...expiry(row)
   };
 }
 function escalationPayload(row: EscalationLimitRecord) {
   return {
     id: row.id, desk_id: row.deskId, name: row.name, channel: row.channel, tier_ladder: row.tierLadder, max_tier: row.maxTier,
     allow_refund_promise: row.allowRefundPromise, allow_feature_promise: row.allowFeaturePromise, allow_timeline_promise: row.allowTimelinePromise,
-    notes: row.notes, status: row.status, revision: row.revision, updated_at: row.updatedAt
+    notes: row.notes, status: row.status, revision: row.revision, updated_at: row.updatedAt, ...expiry(row)
   };
 }
 function commitmentPayload(row: CommitmentRecord) {
-  return { id: row.id, desk_id: row.deskId, kind: row.kind, name: row.name, statement: row.statement, status: row.status, revision: row.revision, updated_at: row.updatedAt };
+  return { id: row.id, desk_id: row.deskId, kind: row.kind, name: row.name, statement: row.statement, status: row.status, revision: row.revision, updated_at: row.updatedAt, ...expiry(row) };
 }

@@ -5,6 +5,7 @@ import type {
   CommitmentRecord,
   DeskStore,
   EscalationLimitRecord,
+  FactType,
   RecordStatus,
   RefundDecision,
   RefundRuleRecord
@@ -17,6 +18,8 @@ type SaveAnswer = {
   answer: string;
   status: RecordStatus;
   expectedRevision?: number;
+  /** undefined keeps the current expiry; null clears it. */
+  expiresAt?: string | null;
 };
 
 type SaveRefund = {
@@ -28,6 +31,8 @@ type SaveRefund = {
   windowDays?: number | null;
   status: RecordStatus;
   expectedRevision?: number;
+  /** undefined keeps the current expiry; null clears it. */
+  expiresAt?: string | null;
 };
 
 type SaveEscalation = {
@@ -42,6 +47,8 @@ type SaveEscalation = {
   notes?: string;
   status: RecordStatus;
   expectedRevision?: number;
+  /** undefined keeps the current expiry; null clears it. */
+  expiresAt?: string | null;
 };
 
 type SaveCommitment = {
@@ -51,6 +58,8 @@ type SaveCommitment = {
   statement: string;
   status: RecordStatus;
   expectedRevision?: number;
+  /** undefined keeps the current expiry; null clears it. */
+  expiresAt?: string | null;
 };
 
 function sameTerms(left: string[], right: string[]): boolean {
@@ -64,6 +73,26 @@ function sameLadder(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function normalizeExpiry(value: string | null | undefined): string | null | undefined {
+  if (value === undefined || value === null) return value;
+  const time = Date.parse(value);
+  if (Number.isNaN(time)) throw new Error("expiresAt must be an ISO 8601 date or datetime");
+  return new Date(time).toISOString();
+}
+
+function resolveExpiry(input: string | null | undefined, existing: { expiresAt?: string | null } | null): string | null | undefined {
+  const normalized = normalizeExpiry(input);
+  if (normalized === undefined) return existing ? existing.expiresAt : undefined;
+  return normalized;
+}
+
+async function keepVersion(store: DeskStore, factType: FactType, existing: { id: string; deskId: string; revision: number }) {
+  await store.recordVersion({
+    deskId: existing.deskId, factType, factId: existing.id, revision: existing.revision,
+    snapshot: { ...existing } as Record<string, unknown>, replacedAt: new Date().toISOString()
+  });
+}
+
 async function requireDesk(store: DeskStore, deskId: string) {
   const desk = await store.getDesk(deskId);
   if (!desk) throw new Error("Desk not found");
@@ -73,13 +102,16 @@ async function requireDesk(store: DeskStore, deskId: string) {
 export async function saveAnswer(store: DeskStore, input: SaveAnswer): Promise<AnswerRecord> {
   await requireDesk(store, input.deskId);
   const existing = await store.findAnswer(input.deskId, input.topic, input.question);
-  const next = { topic: input.topic.trim(), question: input.question.trim(), answer: input.answer.trim(), status: input.status };
-  if (existing && existing.topic === next.topic && existing.question === next.question && existing.answer === next.answer && existing.status === next.status) {
+  const expiresAt = resolveExpiry(input.expiresAt, existing);
+  const next = { expiresAt, topic: input.topic.trim(), question: input.question.trim(), answer: input.answer.trim(), status: input.status };
+  if (existing && existing.topic === next.topic && existing.question === next.question && existing.answer === next.answer && existing.status === next.status &&
+    (existing.expiresAt ?? null) === (next.expiresAt ?? null)) {
     return existing;
   }
   const now = new Date().toISOString();
   if (existing) {
     if (input.expectedRevision !== existing.revision) throw new Error("Revision conflict");
+    await keepVersion(store, "answer", existing);
     const saved = await store.updateAnswer({ ...existing, ...next, revision: existing.revision + 1, updatedAt: now }, existing.revision);
     if (!saved) throw new Error("Revision conflict");
     await store.touchDesk(input.deskId);
@@ -96,7 +128,8 @@ export async function saveRefundRule(store: DeskStore, input: SaveRefund): Promi
   const matchTerms = input.matchTerms.map((term) => term.trim()).filter(Boolean);
   assertSpecificMatchTerms(matchTerms);
   const existing = await store.findRefundRule(input.deskId, input.name);
-  const next = {
+  const expiresAt = resolveExpiry(input.expiresAt, existing);
+  const next = { expiresAt,
     name: input.name.trim(),
     matchTerms,
     decision: input.decision,
@@ -111,13 +144,15 @@ export async function saveRefundRule(store: DeskStore, input: SaveRefund): Promi
     existing.decision === next.decision &&
     existing.remedy === next.remedy &&
     existing.windowDays === next.windowDays &&
-    existing.status === next.status
+    existing.status === next.status &&
+    (existing.expiresAt ?? null) === (next.expiresAt ?? null)
   ) {
     return existing;
   }
   const now = new Date().toISOString();
   if (existing) {
     if (input.expectedRevision !== existing.revision) throw new Error("Revision conflict");
+    await keepVersion(store, "refund_rule", existing);
     const saved = await store.updateRefundRule({ ...existing, ...next, revision: existing.revision + 1, updatedAt: now }, existing.revision);
     if (!saved) throw new Error("Revision conflict");
     await store.touchDesk(input.deskId);
@@ -135,7 +170,8 @@ export async function saveEscalationLimit(store: DeskStore, input: SaveEscalatio
   const maxTier = input.maxTier.trim();
   if (!tierLadder.length || !tierLadder.includes(maxTier)) throw new Error("Escalation tier is not on the ladder");
   const existing = await store.findEscalation(input.deskId, input.channel);
-  const next = {
+  const expiresAt = resolveExpiry(input.expiresAt, existing);
+  const next = { expiresAt,
     name: input.name.trim(),
     channel: input.channel.trim().toLocaleLowerCase(),
     tierLadder,
@@ -156,13 +192,15 @@ export async function saveEscalationLimit(store: DeskStore, input: SaveEscalatio
     existing.allowFeaturePromise === next.allowFeaturePromise &&
     existing.allowTimelinePromise === next.allowTimelinePromise &&
     existing.notes === next.notes &&
-    existing.status === next.status
+    existing.status === next.status &&
+    (existing.expiresAt ?? null) === (next.expiresAt ?? null)
   ) {
     return existing;
   }
   const now = new Date().toISOString();
   if (existing) {
     if (input.expectedRevision !== existing.revision) throw new Error("Revision conflict");
+    await keepVersion(store, "escalation_limit", existing);
     const saved = await store.updateEscalation({ ...existing, ...next, revision: existing.revision + 1, updatedAt: now }, existing.revision);
     if (!saved) throw new Error("Revision conflict");
     await store.touchDesk(input.deskId);
@@ -177,13 +215,16 @@ export async function saveEscalationLimit(store: DeskStore, input: SaveEscalatio
 export async function saveCommitment(store: DeskStore, input: SaveCommitment): Promise<CommitmentRecord> {
   await requireDesk(store, input.deskId);
   const existing = await store.findCommitment(input.deskId, input.kind, input.name);
-  const next = { kind: input.kind, name: input.name.trim(), statement: input.statement.trim(), status: input.status };
-  if (existing && existing.kind === next.kind && existing.name === next.name && existing.statement === next.statement && existing.status === next.status) {
+  const expiresAt = resolveExpiry(input.expiresAt, existing);
+  const next = { expiresAt, kind: input.kind, name: input.name.trim(), statement: input.statement.trim(), status: input.status };
+  if (existing && existing.kind === next.kind && existing.name === next.name && existing.statement === next.statement && existing.status === next.status &&
+    (existing.expiresAt ?? null) === (next.expiresAt ?? null)) {
     return existing;
   }
   const now = new Date().toISOString();
   if (existing) {
     if (input.expectedRevision !== existing.revision) throw new Error("Revision conflict");
+    await keepVersion(store, "commitment", existing);
     const saved = await store.updateCommitment({ ...existing, ...next, revision: existing.revision + 1, updatedAt: now }, existing.revision);
     if (!saved) throw new Error("Revision conflict");
     await store.touchDesk(input.deskId);
