@@ -87,10 +87,13 @@ function resolveExpiry(input: string | null | undefined, existing: { expiresAt?:
 }
 
 async function keepVersion(store: DeskStore, factType: FactType, existing: { id: string; deskId: string; revision: number }) {
-  await store.recordVersion({
-    deskId: existing.deskId, factType, factId: existing.id, revision: existing.revision,
-    snapshot: { ...existing } as Record<string, unknown>, replacedAt: new Date().toISOString()
-  });
+  // Best effort, so an edit still works if the history table is not migrated yet.
+  try {
+    await store.recordVersion({
+      deskId: existing.deskId, factType, factId: existing.id, revision: existing.revision,
+      snapshot: { ...existing } as Record<string, unknown>, replacedAt: new Date().toISOString()
+    });
+  } catch { /* ignore */ }
 }
 
 async function requireDesk(store: DeskStore, deskId: string) {
