@@ -136,3 +136,5 @@ drop trigger if exists on_auth_user_created_desk on auth.users;
 create trigger on_auth_user_created_desk
   after insert on auth.users
   for each row execute function public.handle_new_desk_user();
+
+-- Expiry, version history and usage log: see supabase/migrations/20261016_fact_expiry_versions_usage.sql
