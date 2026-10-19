@@ -378,7 +378,9 @@ app.use((error: unknown, _req: Request, res: Response, _next: express.NextFuncti
 });
 
 const port = Number(process.env.PORT ?? 3000);
-if (process.env.NODE_ENV !== "test") {
+// Vercel imports this module as a Node function. Do not bind a port or stdio there.
+// Glama's image and local `npm start` leave VERCEL unset, so they still listen.
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
   // A terminal keeps Streamable HTTP only. When stdin is not a terminal, also speak MCP on stdio.
   const stdio = useStdioTransport();
   app.listen(port, () => {

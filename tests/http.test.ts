@@ -136,6 +136,26 @@ describe("streamable HTTP", () => {
     expect(body.error).toMatch(/Sign in to Desk/);
   });
 
+  it("rejects a Stripe webhook whose signature does not match the raw body", async () => {
+    const response = await fetch(`${base}/billing/webhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "stripe-signature": "t=1,v1=deadbeef" },
+      body: JSON.stringify({ id: "evt_test", type: "ping" })
+    });
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe("Webhook could not be processed");
+  });
+
+  it("rejects a Stripe webhook that has no signature", async () => {
+    const response = await fetch(`${base}/billing/webhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "evt_test", type: "ping" })
+    });
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe("Missing Stripe signature");
+  });
+
   it("rejects a browser origin that is not an assistant", async () => {
     const response = await fetch(`${base}/mcp`, {
       method: "POST",
